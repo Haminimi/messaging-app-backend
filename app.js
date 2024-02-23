@@ -10,6 +10,8 @@ const MongoStore = require('connect-mongo');
 const session = require('express-session');
 const cors = require('cors');
 
+require('dotenv').config();
+
 const User = require('./models/user');
 
 const mongoConfig = require('./mongoConfig');
@@ -18,6 +20,8 @@ const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
 
 const app = express();
+
+require('./passportJwt');
 
 passport.use(
 	new LocalStrategy(
