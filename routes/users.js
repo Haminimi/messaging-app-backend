@@ -5,6 +5,7 @@ const { body, validationResult } = require('express-validator');
 const passport = require('passport');
 const User = require('../models/user');
 const upload = require('../upload');
+const jwt = require('jsonwebtoken');
 
 router.post(
 	'/',
@@ -54,7 +55,7 @@ router.post(
 		body('about').escape(),
 		body('avatar').custom((value, { req }) => {
 			if (!req.file) {
-				return true
+				return true;
 			}
 			if (!req.file.mimetype.startsWith('image/')) {
 				throw new Error('You should submit an image file.');
@@ -99,5 +100,28 @@ router.post(
 		}
 	}
 );
+
+router.post('/login', async (req, res, next) => {
+	console.log(req.body);
+	passport.authenticate('local', async (error, user, info) => {
+		try {
+			console.log(user);
+			console.log(info);
+
+			req.login(user, async (error) => {
+				if (error) {
+					return res.status(500).json({
+						message: 'Something is wrong',
+						error: error || 'internal server error',
+					});
+				}
+				const token = jwt.sign({ user }, process.env.TOKEN_KEY);
+				return res.json({ success: true, user, token });
+			});
+		} catch (error) {
+			return next(error);
+		}
+	})(req, res, next);
+});
 
 module.exports = router;
