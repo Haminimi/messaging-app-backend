@@ -7,6 +7,19 @@ const User = require('../models/user');
 const upload = require('../upload');
 const jwt = require('jsonwebtoken');
 
+router.get(
+	'/',
+	passport.authenticate('jwt', { session: false }),
+	async (req, res, next) => {
+		try {
+			const users = await User.find().sort({ firstName: 1 }).exec();
+			res.json({ success: true, users });
+		} catch (err) {
+			return next(err);
+		}
+	}
+);
+
 router.post(
 	'/',
 	[
@@ -115,8 +128,10 @@ router.post('/login', async (req, res, next) => {
 						error: error || 'internal server error',
 					});
 				}
-				const token = jwt.sign({ user }, process.env.TOKEN_KEY);
-				return res.json({ success: true, user, token });
+				const id = user._id;
+				const { password, ...userData } = user._doc;
+				const token = jwt.sign({ id }, process.env.TOKEN_KEY);
+				return res.json({ success: true, user: userData, token });
 			});
 		} catch (error) {
 			return next(error);
