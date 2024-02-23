@@ -2,11 +2,15 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const { body, validationResult } = require('express-validator');
+const passport = require('passport');
 const User = require('../models/user');
+const upload = require('../upload');
 
 router.post(
 	'/',
 	[
+		upload.single('avatar'),
+
 		body('first', 'First name must not be empty.')
 			.trim()
 			.notEmpty()
@@ -48,6 +52,14 @@ router.post(
 			}
 		),
 		body('about').escape(),
+		body('avatar').custom((value, { req }) => {
+			if (!req.file) {
+				return true
+			}
+			if (!req.file.mimetype.startsWith('image/')) {
+				throw new Error('You should submit an image file.');
+			}
+		}),
 	],
 	async (req, res, next) => {
 		try {
@@ -64,16 +76,21 @@ router.post(
 							next(err);
 						}
 
+						const uploadedFile = req.file;
+						const filePath = uploadedFile
+							? '/uploads/' + uploadedFile.filename
+							: '';
+
 						const user = new User({
 							firstName: req.body.first,
 							lastName: req.body.last,
 							email: req.body.email,
 							password: hashedPassword,
 							about: req.body.about,
-							avatar: req.body.avatar,
+							avatar: filePath,
 						});
-						await user.save();
-						res.json({ success: true });
+						const createdUser = await user.save();
+						res.json({ success: true, createdUser });
 					}
 				);
 			}
