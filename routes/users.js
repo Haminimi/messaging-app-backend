@@ -22,6 +22,21 @@ router.get(
 	}
 );
 
+router.get(
+	'/:userId',
+	passport.authenticate('jwt', { session: false }),
+	async (req, res, next) => {
+		try {
+			const userId = req.params.userId;
+			const user = await User.findById(userId).exec();
+			const { email, password, friends, ...userData } = user._doc;
+			res.json({ success: true, user: userData });
+		} catch (err) {
+			return next(err);
+		}
+	}
+);
+
 router.post(
 	'/',
 	[
