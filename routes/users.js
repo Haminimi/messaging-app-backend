@@ -7,6 +7,7 @@ const User = require('../models/user');
 const upload = require('../upload');
 const jwt = require('jsonwebtoken');
 const verifyJWT = require('../customVerifyJwt');
+const { ObjectId } = require('mongodb');
 
 router.get(
 	'/',
@@ -240,6 +241,51 @@ router.get('/logout', (req, res, next) => {
 
 router.get('/isUserAuth', verifyJWT, (req, res, next) => {
 	res.json({ success: true, user: req.authUser });
+});
+
+router.post('/:userId/friends', verifyJWT, async (req, res, next) => {
+	try {
+		const userId = req.params.userId;
+		const authUserId = req.authUser.userData._id;
+		const newFriendId = req.body.friend;
+		const newFriendObjectId = new ObjectId(newFriendId);
+		if (userId === authUserId) {
+			const user = await User.findById(authUserId).exec();
+			const friends = user.friends;
+			let newData;
+			if (friends.includes(newFriendObjectId)) {
+				newData = new User({
+					...user,
+					_id: authUserId,
+					friends: friends.filter(
+						(friend) =>
+							friend.toString() !== newFriendObjectId.toString()
+					),
+				});
+			} else {
+				newData = new User({
+					...user,
+					_id: authUserId,
+					friends: [...user.friends, newFriendId],
+				});
+			}
+			const updatedUser = await User.findByIdAndUpdate(
+				authUserId,
+				newData,
+				{ new: true }
+			);
+			const { password, ...updatedUserWithoutPassword } =
+				updatedUser._doc;
+			return res.json({
+				success: true,
+				updatedUser: updatedUserWithoutPassword,
+			});
+		} else {
+			res.status(401).json({ error: 'You are not authorized.' });
+		}
+	} catch (err) {
+		console.error(err);
+	}
 });
 
 module.exports = router;
