@@ -6,6 +6,7 @@ const passport = require('passport');
 const User = require('../models/user');
 const upload = require('../upload');
 const jwt = require('jsonwebtoken');
+const verifyJWT = require('../customVerifyJwt');
 
 router.get(
 	'/',
@@ -39,13 +40,13 @@ router.post(
 			.withMessage(
 				'Email is not in a valid form. It should look something like: johndoe@gmail.com.'
 			)
+			.normalizeEmail()
 			.custom(async (value) => {
 				const user = await User.findOne({ email: value });
 				if (user) {
 					throw new Error('Email already in use.');
 				}
-			})
-			.normalizeEmail(),
+			}),
 		body('password')
 			.trim()
 			.blacklist('<>&\'"/')
@@ -58,7 +59,7 @@ router.post(
 				returnScore: false,
 			})
 			.withMessage(
-				'Must contain at least one uppercase and lowercase letter, one digit, one special character (@$!%*#?), and be at least 8 characters long.'
+				'Password must contain at least one uppercase and lowercase letter, one digit, one special character (@$!%*#?), and be at least 8 characters long.'
 			),
 		body('confirmPassword', 'Passwords do not match.').custom(
 			(value, { req }) => {
@@ -78,9 +79,9 @@ router.post(
 	async (req, res, next) => {
 		try {
 			const errors = validationResult(req);
-
 			if (!errors.isEmpty()) {
-				res.json({ errors });
+				const message = errors.errors[0].msg;
+				return res.json({ error: message });
 			} else {
 				bcrypt.hash(
 					req.body.password,
@@ -90,10 +91,19 @@ router.post(
 							next(err);
 						}
 
-						const uploadedFile = req.file;
+						let filePath;
+						if (!req.file) {
+							filePath = '/uploads/user.png';
+						} else {
+							const avatar = req.file;
+							filePath = avatar
+								? '/uploads/' + avatar.filename
+								: '';
+						}
+						/* const uploadedFile = req.file;
 						const filePath = uploadedFile
 							? '/uploads/' + uploadedFile.filename
-							: '';
+							: ''; */
 
 						const user = new User({
 							firstName: req.body.first,
@@ -104,7 +114,7 @@ router.post(
 							avatar: filePath,
 						});
 						const createdUser = await user.save();
-						res.json({ success: true, createdUser });
+						return res.json({ success: true, createdUser });
 					}
 				);
 			}
@@ -114,24 +124,104 @@ router.post(
 	}
 );
 
+router.post(
+	'/edit',
+	[
+		upload.single('avatar'),
+		body('first', 'First name must not be empty.')
+			.trim()
+			.notEmpty()
+			.escape(),
+		body('last', 'Last name must not be empty.').trim().notEmpty().escape(),
+		body('email')
+			.trim()
+			.notEmpty()
+			.escape()
+			.withMessage('Email must not be empty.')
+			.isEmail()
+			.withMessage(
+				'Email is not in a valid form. It should look something like: johndoe@gmail.com.'
+			)
+			.normalizeEmail()
+			.custom(async (value, { req }) => {
+				const user = await User.findOne({ email: value });
+				if (user && user._id.toString() !== req.body._id) {
+					throw new Error('Email already in use.');
+				}
+			}),
+		body('about').escape(),
+		body('avatar').custom(function (value, { req }) {
+			if (req) {
+				if (req.file && !req.file.mimetype.startsWith('image/')) {
+					throw new Error('You should submit an image file.');
+				}
+			}
+			return true;
+		}),
+	],
+	async (req, res, next) => {
+		try {
+			const errors = validationResult(req);
+			if (!errors.isEmpty()) {
+				const message = errors.errors[0].msg;
+				return res.json({ error: message });
+			} else {
+				let filePath;
+				if (!req.file) {
+					filePath = req.body.avatar;
+				} else {
+					const avatar = req.file;
+					filePath = avatar ? '/uploads/' + avatar.filename : '';
+				}
+
+				const newData = new User({
+					firstName: req.body.first,
+					lastName: req.body.last,
+					email: req.body.email,
+					about: req.body.about,
+					avatar: filePath,
+					_id: req.body._id,
+				});
+
+				const updated = await User.findByIdAndUpdate(
+					req.body._id,
+					newData,
+					{ new: true }
+				);
+
+				const { password, ...updatedUser } = updated._doc;
+				return res.json({ success: true, updatedUser });
+			}
+		} catch (err) {
+			return next(err);
+		}
+	}
+);
+
 router.post('/login', async (req, res, next) => {
 	console.log(req.body);
-	passport.authenticate('local', async (error, user, info) => {
+	passport.authenticate('local', async (serverError, user, info) => {
 		try {
-			console.log(user);
-			console.log(info);
+			if (serverError) {
+				return res.status(500).json({
+					message: 'Internal server error.',
+				});
+			}
 
-			req.login(user, async (error) => {
-				if (error) {
-					return res.status(500).json({
-						message: 'Something is wrong',
-						error: error || 'internal server error',
+			req.login(user, async (authError) => {
+				if (authError) {
+					console.error(authError.message); //Failed to serialize user into session
+					return res.status(401).json({
+						message: info.message, //'Incorrect password.' 'Incorrect email.'
 					});
 				}
-				const id = user._id;
 				const { password, ...userData } = user._doc;
-				const token = jwt.sign({ id }, process.env.TOKEN_KEY);
-				return res.json({ success: true, user: userData, token });
+				const token = jwt.sign({ userData }, process.env.TOKEN_KEY);
+				return res.json({
+					success: true,
+					user: userData,
+					token,
+				});
 			});
 		} catch (error) {
 			return next(error);
