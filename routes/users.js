@@ -238,4 +238,8 @@ router.get('/logout', (req, res, next) => {
 	});
 });
 
+router.get('/isUserAuth', verifyJWT, (req, res, next) => {
+	res.json({ success: true, user: req.authUser });
+});
+
 module.exports = router;
