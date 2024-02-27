@@ -22,6 +22,10 @@ router.get(
 	}
 );
 
+router.get('/isUserAuth', verifyJWT, (req, res, next) => {
+	res.json({ success: true, user: req.authUser });
+});
+
 router.get(
 	'/:userId',
 	passport.authenticate('jwt', { session: false }),
@@ -33,6 +37,25 @@ router.get(
 			res.json({ success: true, user: userData });
 		} catch (err) {
 			return next(err);
+		}
+	}
+);
+
+router.delete(
+	'/:userId',
+	passport.authenticate('jwt', { session: false }),
+	async (req, res, next) => {
+		try {
+			const authUserId = req.user._id.toString();
+			const userId = req.params.userId;
+			if (authUserId === userId) {
+				await User.findByIdAndDelete(authUserId);
+				return res.json({ success: true });
+			} else {
+				return res.json({ error: 'You are not authorized.' });
+			}
+		} catch (err) {
+			return res.json({ error: err });
 		}
 	}
 );
@@ -140,7 +163,7 @@ router.post(
 	}
 );
 
-router.post(
+router.put(
 	'/edit',
 	[
 		upload.single('avatar'),
@@ -252,10 +275,6 @@ router.get('/logout', (req, res, next) => {
 		}
 		res.json({ success: true });
 	});
-});
-
-router.get('/isUserAuth', verifyJWT, (req, res, next) => {
-	res.json({ success: true, user: req.authUser });
 });
 
 router.post('/:userId/friends', verifyJWT, async (req, res, next) => {
