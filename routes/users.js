@@ -22,26 +22,62 @@ router.get(
 	}
 );
 
-router.get('/isUserAuth', verifyJWT, (req, res, next) => {
+router.get('/isUserAuth', verifyJWT, async (req, res, next) => {
 	res.json({ success: true, user: req.authUser });
 });
+
+router.get('/:userId/friends', passport.authenticate('jwt', { session: false }), async (req, res, next) => {
+	try {
+		const userId = req.params.userId;
+		const authUserId = req.user._id;
+		console.log(userId === authUserId.toString())
+		if (userId === authUserId.toString()) {
+			const user = await User.findById(authUserId).populate('friends').exec();
+			const friends = user.friends;
+			const filteredFriends = friends.map((friend) => {
+				const sanitizedFriend = {
+					first: friend.firstName,
+					last: friend.lastName,
+					_id: friend._id,
+				}
+				return sanitizedFriend
+			})
+
+			return res.json({
+				success: true,
+				friends: filteredFriends
+			});
+		} else {
+			res.status(401).json({ error: 'You are not authorized.' });
+		}
+	} catch (err) {
+		return next(err)
+	}
+})
 
 router.get(
 	'/:userId',
 	passport.authenticate('jwt', { session: false }),
 	async (req, res, next) => {
 		try {
+			const authUserId = req.user._id.toString();
 			const userId = req.params.userId;
 			const user = await User.findById(userId).exec();
-			const { email, password, friends, ...userData } = user._doc;
-			res.json({ success: true, user: userData });
+			if (authUserId === userId) {
+				const { password, ...userData } = user._doc;
+				console.log('return user')
+				res.json({ success: true, user: userData });
+			} else {
+				const { email, password, friends, ...userData } = user._doc;
+				res.json({ success: true, user: userData });
+			}
 		} catch (err) {
 			return next(err);
 		}
 	}
 );
 
-router.delete(
+/* router.delete(
 	'/:userId',
 	passport.authenticate('jwt', { session: false }),
 	async (req, res, next) => {
@@ -49,6 +85,11 @@ router.delete(
 			const authUserId = req.user._id.toString();
 			const userId = req.params.userId;
 			if (authUserId === userId) {
+				await User.updateMany(
+					{ friends: userId },
+					{ $pull: { friends: userId } }
+				);
+
 				await User.findByIdAndDelete(authUserId);
 				return res.json({ success: true });
 			} else {
@@ -58,7 +99,7 @@ router.delete(
 			return res.json({ error: err });
 		}
 	}
-);
+); */
 
 router.post(
 	'/',
@@ -107,12 +148,12 @@ router.post(
 		),
 		body('about').escape(),
 		body('avatar').custom((value, { req }) => {
-			if (!req.file) {
-				return true;
+			if (req) {
+				if (req.file && !req.file.mimetype.startsWith('image/')) {
+					throw new Error('You should submit an image file.');
+				}
 			}
-			if (!req.file.mimetype.startsWith('image/')) {
-				throw new Error('You should submit an image file.');
-			}
+			return true;
 		}),
 	],
 	async (req, res, next) => {
@@ -131,6 +172,7 @@ router.post(
 						}
 
 						let filePath;
+						console.log(req.file)
 						if (!req.file) {
 							filePath = '/uploads/user.png';
 						} else {
@@ -166,6 +208,7 @@ router.post(
 router.put(
 	'/edit',
 	[
+		passport.authenticate('jwt', { session: false }),
 		upload.single('avatar'),
 		body('first', 'First name must not be empty.')
 			.trim()
@@ -238,7 +281,7 @@ router.put(
 );
 
 router.post('/login', async (req, res, next) => {
-	console.log(req.body);
+	/* console.log(req.body); */
 	passport.authenticate('local', async (serverError, user, info) => {
 		try {
 			if (serverError) {
@@ -249,16 +292,19 @@ router.post('/login', async (req, res, next) => {
 
 			req.login(user, async (authError) => {
 				if (authError) {
-					console.error(authError.message); //Failed to serialize user into session
+					console.error(authError.message);
+					console.log(info.message) //Failed to serialize user into session
 					return res.status(401).json({
 						message: info.message, //'Incorrect password.' 'Incorrect email.'
 					});
 				}
-				const { password, ...userData } = user._doc;
-				const token = jwt.sign({ userData }, process.env.TOKEN_KEY);
+				/* const { password, ...userWithoutPassword } = user._doc; */
+				const token = jwt.sign({ user }, process.env.TOKEN_KEY);
+				const currentData = await User.findById(user._id).exec()
+				const { password, ...currentDataWithoutPassword } = currentData._doc;
 				return res.json({
 					success: true,
-					user: userData,
+					user: currentDataWithoutPassword,
 					token,
 				});
 			});
@@ -280,20 +326,29 @@ router.get('/logout', (req, res, next) => {
 router.post('/:userId/friends', verifyJWT, async (req, res, next) => {
 	try {
 		const userId = req.params.userId;
-		const authUserId = req.authUser.userData._id;
+		const authUserId = req.authUser._id;
+		console.log(userId)
+		console.log(authUserId.toString())
 		const newFriendId = req.body.friend;
 		const newFriendObjectId = new ObjectId(newFriendId);
-		if (userId === authUserId) {
+		if (userId === authUserId.toString()) {
 			const user = await User.findById(authUserId).exec();
 			const friends = user.friends;
+			console.log('user', user)
+			console.log('friends', friends)
 			let newData;
 			if (friends.includes(newFriendObjectId)) {
+				/* console.log(friends)
+				console.log(newFriendObjectId) */
 				newData = new User({
 					...user,
 					_id: authUserId,
 					friends: friends.filter(
-						(friend) =>
-							friend.toString() !== newFriendObjectId.toString()
+						(friend) => {
+							if (friend !== null) {
+								friend.toString() !== newFriendObjectId.toString()
+							}
+						}
 					),
 				});
 			} else {
