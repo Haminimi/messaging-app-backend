@@ -77,30 +77,6 @@ router.get(
 	}
 );
 
-/* router.delete(
-	'/:userId',
-	passport.authenticate('jwt', { session: false }),
-	async (req, res, next) => {
-		try {
-			const authUserId = req.user._id.toString();
-			const userId = req.params.userId;
-			if (authUserId === userId) {
-				await User.updateMany(
-					{ friends: userId },
-					{ $pull: { friends: userId } }
-				);
-
-				await User.findByIdAndDelete(authUserId);
-				return res.json({ success: true });
-			} else {
-				return res.json({ error: 'You are not authorized.' });
-			}
-		} catch (err) {
-			return res.json({ error: err });
-		}
-	}
-); */
-
 router.post(
 	'/',
 	[
