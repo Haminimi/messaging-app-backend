@@ -28,6 +28,35 @@ router.get('/isUserAuth', verifyJWT, async (req, res, next) => {
 	res.json({ success: true, user: req.authUser });
 });
 
+router.get('/:userId/chats/:chatId',  passport.authenticate('jwt', { session: false }), async (req, res, next) => {
+	try {
+		const chatId = req.params.chatId;
+		const userId = req.params.userId;
+		const authUserId = req.user._id;
+		console.log('authUserId', authUserId)
+		if (userId === authUserId.toString()) {
+			const chat = await Chat.findById(chatId)
+				.populate('messages')
+				.populate({path: 'users', select: 'firstName lastName avatar _id'})
+			const isUserInChat = chat.users.some((user) => {
+				return (user._id).toString() === (authUserId).toString()
+			})
+			if (isUserInChat) {
+				return res.json({
+					success: true,
+					chat
+				});
+			} else {
+				return res.status(401).json({ error: 'You are not authorized. includes' });
+			}
+		} else {
+			return res.status(401).json({ error: 'You are not authorized. toString' });
+		}
+	} catch (err) {
+		return next(err)
+	}
+})
+
 router.get('/:userId/friends', passport.authenticate('jwt', { session: false }), async (req, res, next) => {
 	try {
 		const userId = req.params.userId;
