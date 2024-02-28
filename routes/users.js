@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const { body, validationResult } = require('express-validator');
+const { body, check, validationResult } = require('express-validator');
 const passport = require('passport');
 const User = require('../models/user');
+const Message = require('../models/message');
+const Chat = require('../models/chat');
 const upload = require('../upload');
 const jwt = require('jsonwebtoken');
 const verifyJWT = require('../customVerifyJwt');
@@ -49,6 +51,26 @@ router.get('/:userId/friends', passport.authenticate('jwt', { session: false }),
 			});
 		} else {
 			res.status(401).json({ error: 'You are not authorized.' });
+		}
+	} catch (err) {
+		return next(err)
+	}
+})
+
+router.get('/:userId/chats', passport.authenticate('jwt', { session: false }), async (req, res, next) => {
+	try {
+		const userId = req.params.userId;
+		const authUserId = req.user._id;
+		if (userId === authUserId.toString()) {
+			const chats = await Chat.find({users: authUserId})
+				.populate({path: 'users', select: 'firstName lastName avatar _id'})
+				.populate('messages')
+			return res.json({
+				success: true,
+				chats
+			});
+		} else {
+			return res.status(401).json({ error: 'You are not authorized.' });
 		}
 	} catch (err) {
 		return next(err)
@@ -312,11 +334,11 @@ router.post('/:userId/friends', verifyJWT, async (req, res, next) => {
 			const friends = user.friends;
 			console.log('user', user)
 			console.log('friends', friends)
-			let newData;
+			let updatedData;
 			if (friends.includes(newFriendObjectId)) {
 				/* console.log(friends)
 				console.log(newFriendObjectId) */
-				newData = new User({
+				updatedData = new User({
 					...user,
 					_id: authUserId,
 					friends: friends.filter(
@@ -328,7 +350,7 @@ router.post('/:userId/friends', verifyJWT, async (req, res, next) => {
 					),
 				});
 			} else {
-				newData = new User({
+				updatedData = new User({
 					...user,
 					_id: authUserId,
 					friends: [...user.friends, newFriendId],
@@ -336,14 +358,14 @@ router.post('/:userId/friends', verifyJWT, async (req, res, next) => {
 			}
 			const updatedUser = await User.findByIdAndUpdate(
 				authUserId,
-				newData,
+				updatedData,
 				{ new: true }
 			);
-			const { password, ...updatedUserWithoutPassword } =
+			const { password, ...sanitizedUser } =
 				updatedUser._doc;
 			return res.json({
 				success: true,
-				updatedUser: updatedUserWithoutPassword,
+				updatedUser: sanitizedUser,
 			});
 		} else {
 			res.status(401).json({ error: 'You are not authorized.' });
