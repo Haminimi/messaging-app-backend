@@ -77,6 +77,58 @@ router.get('/:userId/chats', passport.authenticate('jwt', { session: false }), a
 	}
 })
 
+router.post('/:userId/chats', 
+[
+	passport.authenticate('jwt', { session: false }),
+	check('users')
+		.isLength({ min: 2 })
+		.withMessage('The users array must have at least two elements.')
+],
+async (req, res, next) => {
+	try {
+		const errors = validationResult(req);
+			if (!errors.isEmpty()) {
+				console.log('req.body.users', req.body.users)
+				console.log(errors)
+				const message = errors.errors[0].msg;
+				return res.json({ error: message });
+			} else {
+				console.log(req.body.users)
+				const userId = req.params.userId;
+				const authUserId = req.user._id;
+				if (userId === authUserId.toString()) {
+					const { users: userIDs } = req.body;
+					const existingChat = await Chat.findOne({
+						users: {$all: [...userIDs]}
+					})
+
+					if (existingChat) {
+						res.json({
+							success: true,
+							chat: existingChat
+						})
+					} else {
+						const newChat = new Chat(
+							{
+								users: req.body.users,
+								messages: [],
+							}
+						)
+						const chat = await newChat.save()
+						res.json({
+							success: true,
+							chat
+						})
+					}
+				} else {
+					res.status(401).json({ error: 'You are not authorized.' });
+				}
+			}
+	} catch (err) {
+		return next(err)
+	}
+})
+
 router.get(
 	'/:userId',
 	passport.authenticate('jwt', { session: false }),
