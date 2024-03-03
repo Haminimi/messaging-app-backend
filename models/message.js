@@ -3,22 +3,7 @@ const Schema = mongoose.Schema;
 
 const MessageSchema = new Schema({
 	chat: { type: Schema.Types.ObjectId, ref: 'Chat', required: true },
-	message: {
-		textMessage: {
-			type: String,
-			required: function () {
-				return this.message.imageMessage ? false : true;
-			},
-			message: 'Either textMessage or imageMessage is required.',
-		},
-		imageMessage: {
-			type: String,
-			required: function () {
-				return this.message.textMessage ? false : true;
-			},
-			message: 'Either textMessage or imageMessage is required.',
-		},
-	},
+	message: { type: String, required: true },
 	author: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 	timestamp: { type: Number, required: true },
 });
