@@ -15,7 +15,12 @@ const app = express();
 
 require('./passportJwt');
 
-app.use(cors());
+const corsOptions = {
+	origin: process.env.FRONTEND_URL,
+	optionsSuccessStatus: 200,
+};
+
+app.use(cors(corsOptions));
 
 if (process.env.NODE_ENV === 'development') {
 	app.use(logger('dev'));
