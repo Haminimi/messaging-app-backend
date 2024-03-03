@@ -1,6 +1,6 @@
 # ChitChatHub - Messaging App (Backend)
 ## Description
-[The project](https://www.theodinproject.com/lessons/nodejs-messaging-app) is a part of [The Odin Project](https://www.theodinproject.com/dashboard)'s Node course within [The Odin Project](https://www.theodinproject.com/dashboard)'s curriculum. The Odin Project provides a high quality web development education maintained by an open source community.
+A basic messaging app with authentication and authorization using JWT. [The project](https://www.theodinproject.com/lessons/nodejs-messaging-app) is a part of [The Odin Project](https://www.theodinproject.com/dashboard)'s Node course within [The Odin Project](https://www.theodinproject.com/dashboard)'s curriculum. The Odin Project provides a high quality web development education maintained by an open source community.
 ## Live Preview and Frontend
 You can check out [the app here](https://messaging-app-rosy.vercel.app/), and [the frontend code with more details about the project here](https://github.com/Haminimi/messaging-app).
 ## Tech
