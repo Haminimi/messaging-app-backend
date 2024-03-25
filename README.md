@@ -9,8 +9,8 @@ You can check out [the app here](https://messaging-app-rosy.vercel.app/), and [t
 - MongoDB
 
 **Tools**
-- Git
 - Visual Studio Code
+- Git
 ## Author
 - [GitHub](https://github.com/Haminimi)
 - [Exercism](https://exercism.org/profiles/Haminimi)
